@@ -26,8 +26,8 @@ Protocols to specify the number and type of contents.
 */
 @objc public protocol AKPickerViewDataSource {
 	func numberOfItemsInPickerView(pickerView: AKPickerView) -> Int
-	optional func pickerView(pickerView: AKPickerView, titleForItem item: Int) -> String
-	optional func pickerView(pickerView: AKPickerView, imageForItem item: Int) -> UIImage
+	optional func pickerView(pickerView: AKPickerView, titleForItem item:Int) -> NSString
+	optional func pickerView(pickerView: AKPickerView, imageForItem item:Int) -> UIImage
 }
 
 // MARK: AKPickerViewDelegate
@@ -36,9 +36,9 @@ Protocols to specify the attitude when user selected an item,
 and customize the appearance of labels.
 */
 @objc public protocol AKPickerViewDelegate: UIScrollViewDelegate {
-	optional func pickerView(pickerView: AKPickerView, didSelectItem item: Int)
-	optional func pickerView(pickerView: AKPickerView, marginForItem item: Int) -> CGSize
-	optional func pickerView(pickerView: AKPickerView, configureLabel label: UILabel, forItem item: Int)
+	optional func pickerView(pickerView: AKPickerView, didSelectItem item:Int)
+	optional func pickerView(pickerView: AKPickerView, marginForItem item:Int) -> CGSize
+	optional func pickerView(pickerView: AKPickerView, configureLabel label:UILabel, forItem item:Int)
 }
 
 // MARK: - Private Classes and Protocols
@@ -114,7 +114,7 @@ private class AKCollectionViewCell: UICollectionViewCell {
 
 // MARK: AKCollectionViewLayout
 /**
-Private. A subclass of UICollectionViewFlowLayout used in the collection view.
+Private. A subclass of UICollectionViewFlowLayout used in AKPickerView's collection view.
 */
 private class AKCollectionViewLayout: UICollectionViewFlowLayout {
 	var delegate: AKCollectionViewLayoutDelegate!
@@ -246,10 +246,36 @@ public class AKPickerView: UIView, UICollectionViewDataSource, UICollectionViewD
 	public lazy var highlightedTextColor = UIColor.blackColor()
 	/// Readwrite. A float value which indicates the spacing between cells.
 	public var interitemSpacing: CGFloat = 0.0
-	/// Readwrite. A float value which determines the perspective representation which used when using AKPickerViewStyle.Wheel style.
-	public var viewDepth: CGFloat = 1000.0
 	/// Readwrite. The style of the picker view. See AKPickerViewStyle.
 	public var pickerViewStyle = AKPickerViewStyle.Wheel
+	/// Readwrite. A float value which determines the perspective representation which used when using AKPickerViewStyle.Wheel style.
+	public var viewDepth: CGFloat = 1000.0 {
+		didSet {
+			self.collectionView.layer.sublayerTransform = self.viewDepth > 0.0 ? {
+				var transform = CATransform3DIdentity;
+				transform.m34 = -1.0 / self.viewDepth;
+				return transform;
+			}() : CATransform3DIdentity;
+		}
+	}
+	/// Readwrite. A boolean value indicates whether the mask is disabled.
+	public var maskDisabled: Bool! = nil {
+		didSet {
+			self.collectionView.layer.mask = self.maskDisabled == true ? nil : {
+				let maskLayer = CAGradientLayer()
+				maskLayer.frame = self.collectionView.bounds
+				maskLayer.colors = [
+					UIColor.clearColor().CGColor,
+					UIColor.blackColor().CGColor,
+					UIColor.blackColor().CGColor,
+					UIColor.clearColor().CGColor]
+				maskLayer.locations = [0.0, 0.33, 0.66, 1.0]
+				maskLayer.startPoint = CGPointMake(0.0, 0.0)
+				maskLayer.endPoint = CGPointMake(1.0, 0.0)
+				return maskLayer
+			}()
+		}
+	}
 
 	// MARK: Readonly Properties
 	/// Readonly. Index of currently selected item.
@@ -294,17 +320,7 @@ public class AKPickerView: UIView, UICollectionViewDataSource, UICollectionViewD
 		self.intercepter = AKPickerViewDelegateIntercepter(pickerView: self, delegate: self.delegate)
 		self.collectionView.delegate = self.intercepter
 
-		let maskLayer = CAGradientLayer()
-		maskLayer.frame = self.collectionView.bounds
-		maskLayer.colors = [
-			UIColor.clearColor().CGColor,
-			UIColor.blackColor().CGColor,
-			UIColor.blackColor().CGColor,
-			UIColor.clearColor().CGColor]
-		maskLayer.locations = [0.0, 0.33, 0.66, 1.0]
-		maskLayer.startPoint = CGPointMake(0.0, 0.0)
-		maskLayer.endPoint = CGPointMake(1.0, 0.0)
-		self.collectionView.layer.mask = maskLayer
+		self.maskDisabled = self.maskDisabled == nil ? false : self.maskDisabled
 	}
 
 	override init() {
@@ -332,11 +348,7 @@ public class AKPickerView: UIView, UICollectionViewDataSource, UICollectionViewD
 		super.layoutSubviews()
 		self.collectionView.collectionViewLayout = self.collectionViewLayout
 		self.scrollToItem(self.selectedItem, animated: false)
-		self.collectionView.layer.mask.frame = self.collectionView.bounds
-
-		var transform = CATransform3DIdentity;
-		transform.m34 = -1.0 / max(self.viewDepth, 1.0);
-		self.collectionView.layer.sublayerTransform = transform;
+		self.collectionView.layer.mask?.frame = self.collectionView.bounds
 	}
 
 	public override func intrinsicContentSize() -> CGSize {
@@ -492,7 +504,7 @@ public class AKPickerView: UIView, UICollectionViewDataSource, UICollectionViewD
 	}
 
 	public func collectionView(collectionView: UICollectionView, cellForItemAtIndexPath indexPath: NSIndexPath) -> UICollectionViewCell {
-		let cell = collectionView.dequeueReusableCellWithReuseIdentifier(NSStringFromClass(AKCollectionViewCell.self), forIndexPath: indexPath) as! AKCollectionViewCell
+		let cell = collectionView.dequeueReusableCellWithReuseIdentifier(NSStringFromClass(AKCollectionViewCell.self), forIndexPath: indexPath) as AKCollectionViewCell
 		if let title = self.dataSource?.pickerView?(self, titleForItem: indexPath.item) {
 			cell.label.text = title
 			cell.label.textColor = self.textColor
@@ -511,6 +523,7 @@ public class AKPickerView: UIView, UICollectionViewDataSource, UICollectionViewD
 			cell.imageView.image = image
 		}
 		cell._selected = (indexPath.item == self.selectedItem)
+
 		return cell
 	}
 
@@ -570,7 +583,7 @@ public class AKPickerView: UIView, UICollectionViewDataSource, UICollectionViewD
 		self.delegate?.scrollViewDidScroll?(scrollView)
 		CATransaction.begin()
 		CATransaction.setValue(kCFBooleanTrue, forKey: kCATransactionDisableActions)
-		self.collectionView.layer.mask.frame = self.collectionView.bounds
+		self.collectionView.layer.mask?.frame = self.collectionView.bounds
 		CATransaction.commit()
 	}
 
