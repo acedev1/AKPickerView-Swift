@@ -24,7 +24,6 @@ class ViewController: UIViewController, AKPickerViewDataSource, AKPickerViewDele
 		self.pickerView.interitemSpacing = 20.0
 		self.pickerView.viewDepth = 1000.0
 		self.pickerView.pickerViewStyle = .Wheel
-		self.pickerView.maskDisabled = false
 		self.pickerView.reloadData()
 	}
 
@@ -42,7 +41,7 @@ class ViewController: UIViewController, AKPickerViewDataSource, AKPickerViewDele
 	uncomment '-pickerView:imageForItem:' to see how it works.
 
 	*/
-	func pickerView(pickerView: AKPickerView, titleForItem item: Int) -> NSString {
+	func pickerView(pickerView: AKPickerView, titleForItem item: Int) -> String {
 		return self.titles[item]
 	}
 
